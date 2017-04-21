@@ -142,7 +142,26 @@ public class BezierCurve {
     public func length() -> BKFloat {
         return Utils.length({(_ t: BKFloat) in self.derivative(t)})
     }
+    
+    public func flatness() -> BKFloat {
+        // https://jeremykun.com/2013/05/11/bezier-curves-and-picasso/
+        if self.order == 3 {
+            let P0 = self.points[0]
+            let P1 = self.points[1]
+            let P2 = self.points[2]
+            let P3 = self.points[3]
+            let a: BKPoint = 3.0 * P1 - 2.0 * P0 - P3
+            let b: BKPoint = 3.0 * P2 - P0 - 2.0 * P3
+            // TODO: handle 3D
+            return 1.0 / 16.0 * ( max(a.x * a.x, b.x * b.x) + max(a.y * a.y, b.y * b.y))
+        }
+        else {
+            // TODO: implement me
+            assert(false, "unimplemented!")
+        }
         
+    }
+    
     // MARK:
     
     // computes the extrema for each dimension

@@ -244,6 +244,10 @@ class Draw {
         context.closePath()
         context.strokePath()
     }
+    
+//    static func drawCapsule(_ context: CGContext, p1: CGPoint, p2: CGPoint, radius: CGFloat, offset ox : BKPoint = BKPointZero) {
+//        
+//    }
 
     static func drawShape(_ context: CGContext, shape: Shape, offset: BKPoint = BKPointZero) {
         let order = shape.forward.points.count - 1

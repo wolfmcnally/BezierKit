@@ -9,5 +9,6 @@
 public protocol Normed {
     associatedtype F
     var length: F { get }
+    var length2: F { get }
     func normalize() -> Self
 }

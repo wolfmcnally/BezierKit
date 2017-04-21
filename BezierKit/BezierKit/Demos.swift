@@ -391,5 +391,22 @@ class Demos {
                                     Draw.drawPoint(context, origin: curve.compute(intersection.t1))
                                 }
     })
-    static let all: [Demo] = [demo1, demo2, demo3, demo4, demo5, demo6, demo7, demo8, demo9, demo10, demo11, demo12, demo13, demo14, demo15, demo16, demo17, demo18, demo19, demo20, demo21, demo22]
+    static let demo23 = Demo(title: ".flatness",
+                             quadraticControlPoints: quadraticControlPoints,
+                             cubicControlPoints: cubicControlPoints,
+                             drawFunction: {(context: CGContext, demoState: DemoState) in
+                                let curve = demoState.curve!
+                                Draw.drawSkeleton(context, curve: curve)
+                                Draw.drawCurve(context, curve: curve)
+                                Draw.setColor(context, color: Draw.pinkish)
+                                
+                                var flatness = sqrt(curve.flatness())
+                                
+                                Draw.drawCircle(context, center: curve.points[0], radius: flatness)
+                                Draw.drawCircle(context, center: curve.points.last!, radius: flatness)
+//                                Draw.drawCapsule(context, p1: curve.points[0], p2: curve.points.last!, radius: flatness)
+
+   })
+
+    static let all: [Demo] = [demo1, demo2, demo3, demo4, demo5, demo6, demo7, demo8, demo9, demo10, demo11, demo12, demo13, demo14, demo15, demo16, demo17, demo18, demo19, demo20, demo21, demo22, demo23]
 }

@@ -234,8 +234,8 @@ internal class Utils {
     }
     
     static func droots(_ p: [BKFloat]) -> [BKFloat] {
-        // quadratic roots are easy
         if p.count == 3 {
+            // quadratic roots are easy
             let a = p[0]
             let b = p[1]
             let c = p[2]
@@ -252,8 +252,8 @@ internal class Utils {
             }
             return []
         }
-        // linear roots are even easier
-        if p.count == 2 {
+        else if p.count == 2 {
+            // linear roots are even easier
             let a = p[0]
             let b = p[1]
             if a != b {
@@ -261,8 +261,9 @@ internal class Utils {
             }
             return []
         }
-        assert(false, "nope!")
-        return []
+        else {
+            fatalError("bad number of points for root finding")
+        }
     }
     
     static func lerp(_ r: BKFloat, _ v1: BKPoint, _ v2: BKPoint) -> BKPoint {
@@ -341,56 +342,142 @@ internal class Utils {
         )
     }
     
+    static func distance2(_ p: BKPoint,_ l1: BKPoint,_ l2: BKPoint) -> (d2: BKFloat, t: BKFloat) {
+        let delta = l2 - l1
+        let rel = p - l1
+        let dot = rel.dot(delta)
+        let param: BKFloat = dot / delta.length2
+        var closest: BKPoint
+        var t: BKFloat
+        if param < 0 {
+            t = 0.0
+            closest = l1
+        }
+        else if param > 1 {
+            t = 1.0
+            closest = l2
+        }
+        else {
+            t = param
+            closest = l1 + param * delta
+        }
+        return (d2: (p - closest).length2, t: t)
+    }
+    
+    static func lineIntersection(_ l11: BKPoint,_ l12: BKPoint,_ l21: BKPoint,_ l22: BKPoint, clamp: Bool = true) -> Intersection? {
+        
+        let a1 = l11
+        let b1 = l12 - l11
+        let a2 = l21
+        let b2 = l22 - l21
+        
+        let _a = b1.x
+        let _b = -b2.x
+        let _c = b1.y
+        let _d = -b2.y
+        
+        // by Cramer's rule we have
+        // t1 = ed - bf / ad - bc
+        // t2 = af - ec / ad - bc
+        let det = _a * _d - _b * _c
+        
+        let _e = -a1.x + a2.x
+        let _f = -a1.y + a2.y
+        
+        let inv_det = 1.0 / det
+        let t1 = ( _e * _d - _b * _f ) * inv_det
+        if clamp && (t1 >= 1.0 || t1 <= 0.0)  {
+            return nil // t1 out of interval [0, 1]
+        }
+        let t2 = ( _a * _f - _e * _c ) * inv_det
+        if clamp && (t2 >= 1.0 || t2 <= 0.0) {
+            return nil // t2 out of interval [0, 1]
+        }
+        // segments intersect at t1, t2
+        return Intersection(t1: t1, t2: t2)
+    }
+    
+    static func lineDistance2(a1: BKPoint, a2: BKPoint, b1: BKPoint, b2: BKPoint) -> (d2: BKFloat, t1: BKFloat, t2: BKFloat) {
+        if let i = lineIntersection(a1, a2, b1, b2) {
+            return (d2: 0.0, t1: i.t1, t2: i.t2)
+        }
+        else {
+            var (d2, t) = distance2(a1, b1, b2)
+            var shortest_d2 = d2
+            var t1: BKFloat = 0.0
+            var t2: BKFloat = t
+            (d2, t) = distance2(a2, b1, b2)
+            if d2 < shortest_d2 {
+                shortest_d2 = d2
+                t1 = 1.0
+                t2 = t
+            }
+            (d2, t) = distance2(b1, a1, a2)
+            if d2 < shortest_d2 {
+                shortest_d2 = d2
+                t1 = t
+                t2 = 0.0
+            }
+            (d2, t) = distance2(b2, a1, a2)
+            if d2 < shortest_d2 {
+                shortest_d2 = d2
+                t1 = t
+                t2 = 1.0
+            }
+            return (shortest_d2, t1, t2)
+        }
+    }
+    
     static func pairiteration(_ c1: Subcurve, _ c2: Subcurve, _ threshold: BKFloat = 0.5) -> [Intersection] {
-        let c1b = c1.curve.boundingBox
-        let c2b = c2.curve.boundingBox
-        if ((c1b.size.x + c1b.size.y) < threshold && (c2b.size.x + c2b.size.y) < threshold) {
-            // return [ Intersection(t1: (c1._t1+c1._t2) / 2.0, t2: (c2._t1+c2._t2) / 2.0) ]
-            
-            let a1 = c1.curve.points[0]
-            let b1 = c1.curve.points.last! - c1.curve.points[0]
-            let a2 = c2.curve.points[0]
-            let b2 = c2.curve.points.last! - c2.curve.points[0]
-            
-            let _a = b1.x
-            let _b = -b2.x
-            let _c = b1.y
-            let _d = -b2.y
-            
-            // by Cramer's rule we have
-            // t1 = ed - bf / ad - bc
-            // t2 = af - ec / ad - bc
-            let det = _a * _d - _b * _c
-            
-            let _e = -a1.x + a2.x
-            let _f = -a1.y + a2.y
-            
-            let inv_det = 1.0 / det
-            let t1 = ( _e * _d - _b * _f ) * inv_det
-            if t1 >= 1.0 || t1 <= 0.0  {
-                return [] // t1 out of interval [0, 1]
+        
+        let flatness1 = c1.curve.flatness()
+        let flatness2 = c2.curve.flatness()
+        
+        let (d2, t1, t2) = lineDistance2(a1: c1.curve.points[0],
+                                         a2: c1.curve.points.last!,
+                                         b1: c2.curve.points[0],
+                                         b2: c2.curve.points.last!)
+        
+        let threshold2 = threshold * threshold
+        if (flatness1 < threshold2) && (flatness2 < threshold2) {
+            if d2 == 0.0 {
+                return [Intersection(t1: t1 * c1.t2 + (1.0 - t1) * c1.t1,
+                                     t2: t2 * c2.t2 + (1.0 - t2) * c2.t1)]
             }
-            let t2 = ( _a * _f - _e * _c ) * inv_det
-            if t2 >= 1.0 || t2 <= 0.0 {
-                return [] // t2 out of interval [0, 1]
+            else {
+              return []
             }
-            // segments intersect at t1, t2
-            return [Intersection(t1: t1 * c1.t2 + (1.0 - t1) * c1.t1,
-                                 t2: t2 * c2.t2 + (1.0 - t2) * c2.t1)]
-            
+        }
+        else if ( d2 > flatness1 ) && ( d2 > flatness2 ) {
+            return []
         }
         
-        let cc1 = c1.split(at: 0.5)
-        let cc2 = c2.split(at: 0.5)
+        var pairs = Array<(left: Subcurve, right: Subcurve)>()
         
-        var pairs = [
-            (left: cc1.left, right: cc2.left ),
-            (left: cc1.left, right: cc2.right ),
-            (left: cc1.right, right: cc2.left ),
-            (left: cc1.right, right: cc2.right )]
-        pairs = pairs.filter( {(pair) in
-            return pair.left.curve.boundingBox.overlaps(pair.right.curve.boundingBox)
-        })
+        if flatness1 < threshold2 {
+            let cc2 = c2.split(at: 0.5)
+            pairs = [
+                (left: c1, right: cc2.left),
+                (left: c1, right: cc2.right)]
+        }
+        else if flatness2 < threshold {
+            let cc1 = c1.split(at: 0.5)
+            pairs = [
+                (left: cc1.left, right: c2),
+                (left: cc1.right, right: c2)]
+        }
+        else {
+            let cc2 = c2.split(at: 0.5)
+            let cc1 = c1.split(at: 0.5)
+            pairs = [
+                (left: cc1.left, right: cc2.left),
+                (left: cc1.left, right: cc2.right),
+                (left: cc1.right, right: cc2.left),
+                (left: cc1.right, right: cc2.right)]
+        }
+//        pairs = pairs.filter( {(pair) in
+//            return pair.left.curve.boundingBox.overlaps(pair.right.curve.boundingBox)
+//        })
         
         var results: [Intersection] = Array<Intersection>()
         for pair in pairs {

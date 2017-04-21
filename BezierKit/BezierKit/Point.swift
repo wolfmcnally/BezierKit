@@ -13,9 +13,9 @@ public protocol Point: VectorSpace, Normed {
 extension Point {
     // this extension implements Normed protocol for all point types
     public var length: F {
-        return F.sqrt(self.lengthSquared)
+        return F.sqrt(self.length2)
     }
-    private var lengthSquared: F {
+    public var length2: F {
         return self.dot(self)
     }
     public func normalize() -> Self {
