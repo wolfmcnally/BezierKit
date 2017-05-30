@@ -404,5 +404,29 @@ class Demos {
                                     Draw.drawPoint(context, origin: curve.compute(intersection.t1))
                                 }
     })
-    static let all: [Demo] = [demo1, demo2, demo3, demo4, demo5, demo6, demo7, demo8, demo9, demo10, demo11, demo12, demo13, demo14, demo15, demo16, demo17, demo18, demo19, demo20, demo21, demo22]
+    static let demo23 = Demo(title: ".clipToRect(rect)",
+                             quadraticControlPoints: [CGPoint(x: 48, y: 84),CGPoint(x: 100, y: 187), CGPoint(x: 166, y: 37)],
+                             cubicControlPoints: [CGPoint(x: 48, y: 84), CGPoint(x: 104, y: 176), CGPoint(x: 190, y: 37), CGPoint(x: 121, y: 75)],
+                             drawFunction: {(context: CGContext, demoState: DemoState) in
+                                let curve = demoState.curve! as! CubicBezierCurve
+//                                let curve2: BezierCurve = demoState.quadratic ? QuadraticBezierCurve(points: [BKPoint(x: 68.0, y: 150.0), BKPoint(x: 74.0, y: 6.0), BKPoint(x: 143.0, y: 150.0)]) : CubicBezierCurve(points: [BKPoint(x: 68.0, y: 145.0), BKPoint(x: 74.0, y: 6.0), BKPoint(x: 143.0, y: 197.0), BKPoint(x: 138.0, y: 55.0)])
+                                Draw.drawSkeleton(context, curve: curve)
+                                Draw.drawCurve(context, curve: curve)
+                                
+                                Draw.setColor(context, color: Draw.red)
+                                let box: BoundingBox = BoundingBox(min: BKPoint(x: 72.0, y: 100.0),
+                                                                   max: BKPoint(x: 143.0, y: 197.0))
+                                Draw.drawBoundingBox(context, boundingBox: box)
+
+                                if let c = curve.clipToBox(box) {
+                                    Draw.drawCurve(context, curve: c)
+                                }
+                                
+//                                Draw.setColor(context, color: Draw.black)
+//                                for intersection in curve.intersects(curve: curve2) {
+//                                    Draw.drawPoint(context, origin: curve.compute(intersection.t1))
+//                                }
+    })
+
+    static let all: [Demo] = [demo1, demo2, demo3, demo4, demo5, demo6, demo7, demo8, demo9, demo10, demo11, demo12, demo13, demo14, demo15, demo16, demo17, demo18, demo19, demo20, demo21, demo22, demo23]
 }

@@ -175,6 +175,62 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
         return BoundingBox(min: mmin, max: mmax)
     }
     
+    public func clipToBox(_ box: BoundingBox) -> CubicBezierCurve? {
+        
+        let offset1 = box.max.y
+        let offset2 = box.min.y
+        let offset3 = box.max.x
+        let offset4 = box.min.x
+        
+        var rangeStart: BKFloat? = nil
+        var rangeEnd: BKFloat? = nil
+        
+        let callback: (_ r: BKFloat) -> () = {(_ r: BKFloat) in
+            if r < 0.0 || r > 1.0 {
+                return
+            }
+            if box.containsPoint(self.compute(r), 1.0e-6) {
+                if rangeStart == nil || r < rangeStart! {
+                    rangeStart = r
+                }
+                if rangeEnd == nil || r > rangeEnd! {
+                    rangeEnd = r
+                }
+            }
+        }
+        
+        callback(0.0)
+        Utils.droots(self.p0.y - offset1,
+                     self.p1.y - offset1,
+                     self.p2.y - offset1,
+                     self.p3.y - offset1,
+                     callback: callback)
+        Utils.droots(self.p0.y - offset2,
+                     self.p1.y - offset2,
+                     self.p2.y - offset2,
+                     self.p3.y - offset2,
+                     callback: callback)
+        Utils.droots(self.p0.x - offset3,
+                     self.p1.x - offset3,
+                     self.p2.x - offset3,
+                     self.p3.x - offset3,
+                     callback: callback)
+        Utils.droots(self.p0.x - offset4,
+                     self.p1.x - offset4,
+                     self.p2.x - offset4,
+                     self.p3.x - offset4,
+                     callback: callback)
+        callback(1.0)
+        
+        if rangeStart == nil {
+            return nil
+        }
+        else {
+            return self.split(from: rangeStart!, to: rangeEnd!)
+        }
+        
+    }
+    
     public func compute(_ t: BKFloat) -> BKPoint {
         if t == 0 {
             return self.p0

@@ -111,6 +111,14 @@ public struct BBox<P>: Equatable where P: Point, P.F: Ordered {
         }
         return true
     }
+    public func containsPoint(_ point: BKPoint, _ epsilon: BKFloat) -> Bool {
+        for i in 0..<P.dimensions {
+            if point[i] > max[i]+epsilon || point[i] < min[i]-epsilon {
+                return false
+            }
+        }
+        return true
+    }
     public var toCGRect: CGRect {
         let s = self.size
         return CGRect(origin: self.min.toCGPoint(), size: CGSize(width: s.x, height: s.y))

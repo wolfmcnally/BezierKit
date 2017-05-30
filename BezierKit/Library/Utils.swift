@@ -247,6 +247,47 @@ internal class Utils {
         }
     }
     
+    static func droots(_ pa: BKFloat, _ pb: BKFloat, _ pc: BKFloat, _ pd: BKFloat, callback:((BKFloat)->())) {
+        let d = (-pa + 3*pb - 3*pc + pd)
+        let a = (3*pa - 6*pb + 3*pc) / d
+        let b = (-3*pa + 3*pb) / d
+        let c = pa / d
+        let p = (3*b - a*a)/3
+        let p3 = p/3
+        let q = (2*a*a*a - 9*a*b + 27*c)/27
+        let q2 = q/2
+        let discriminant = q2*q2 + p3*p3*p3
+        if discriminant < 0 {
+            let mp3 = -p/3
+            let mp33 = mp3*mp3*mp3
+            let r = sqrt( mp33 )
+            let t = -q/(2*r)
+            let cosphi = t < -1 ? -1 : t > 1 ? 1 : t
+            let phi = acos(cosphi)
+            let crtr = crt(r)
+            let t1 = 2*crtr
+            let x1 = t1 * cos(phi/3) - a/3
+            let x2 = t1 * cos((phi+tau)/3) - a/3
+            let x3 = t1 * cos((phi+2*tau)/3) - a/3
+            callback(x1)
+            callback(x2)
+            callback(x3)
+        }
+        else if discriminant == 0 {
+            let u1 = q2 < 0 ? crt(-q2) : -crt(q2)
+            let x1 = 2*u1-a/3
+            let x2 = -u1 - a/3
+            callback(x1)
+            callback(x2)
+        }
+        else {
+            let sd = sqrt(discriminant)
+            let u1 = crt(-q2+sd)
+            let v1 = crt(q2+sd)
+            callback(u1-v1-a/3)
+        }
+    }
+    
     static func droots(_ a: BKFloat, _ b: BKFloat, _ c: BKFloat, callback:((BKFloat)->())) {
         // quadratic roots are easy
         // do something with each root
