@@ -231,6 +231,36 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
         
     }
     
+    public func applyAffineTransform(_ transform: CGAffineTransform) -> CubicBezierCurve {
+        return CubicBezierCurve(p0: BKPoint(self.p0.toCGPoint().applying(transform)),
+                                p1: BKPoint(self.p1.toCGPoint().applying(transform)),
+                                p2: BKPoint(self.p2.toCGPoint().applying(transform)),
+                                p3: BKPoint(self.p3.toCGPoint().applying(transform)))
+    }
+    
+    public func clipToCurve(_ other: CubicBezierCurve) -> CubicBezierCurve? {
+     
+        var d = other.endingPoint - other.startingPoint
+        if d.length > 1.0e-10 {
+            
+            d = d.normalize()
+            let n = BKPoint(x: -d.y, y: d.x)
+            
+            let transform = CGAffineTransform(a: d.x, b: n.x, c: d.y, d: n.y, tx: startingPoint.x, ty: startingPoint.y)
+            let inverted = transform.inverted()
+            
+            let selfTransformed     = self.applyAffineTransform(inverted)
+            let otherTransformed    = other.applyAffineTransform(inverted)
+
+            return selfTransformed.clipToBox(otherTransformed.boundingBox)?.applyAffineTransform(transform)
+            
+        }
+        else {
+            return self.clipToBox(other.boundingBox)
+        }
+        
+    }
+    
     public func compute(_ t: BKFloat) -> BKPoint {
         if t == 0 {
             return self.p0

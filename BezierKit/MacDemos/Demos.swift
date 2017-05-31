@@ -409,16 +409,16 @@ class Demos {
                              cubicControlPoints: [CGPoint(x: 48, y: 84), CGPoint(x: 104, y: 176), CGPoint(x: 190, y: 37), CGPoint(x: 121, y: 75)],
                              drawFunction: {(context: CGContext, demoState: DemoState) in
                                 let curve = demoState.curve! as! CubicBezierCurve
-//                                let curve2: BezierCurve = demoState.quadratic ? QuadraticBezierCurve(points: [BKPoint(x: 68.0, y: 150.0), BKPoint(x: 74.0, y: 6.0), BKPoint(x: 143.0, y: 150.0)]) : CubicBezierCurve(points: [BKPoint(x: 68.0, y: 145.0), BKPoint(x: 74.0, y: 6.0), BKPoint(x: 143.0, y: 197.0), BKPoint(x: 138.0, y: 55.0)])
+                                let curve2: CubicBezierCurve = CubicBezierCurve(points: [BKPoint(x: 68.0, y: 145.0), BKPoint(x: 74.0, y: 6.0), BKPoint(x: 143.0, y: 197.0), BKPoint(x: 138.0, y: 55.0)])
                                 Draw.drawSkeleton(context, curve: curve)
                                 Draw.drawCurve(context, curve: curve)
                                 
                                 Draw.setColor(context, color: Draw.red)
                                 let box: BoundingBox = BoundingBox(min: BKPoint(x: 72.0, y: 100.0),
                                                                    max: BKPoint(x: 143.0, y: 197.0))
-                                Draw.drawBoundingBox(context, boundingBox: box)
+                                Draw.drawCurve(context, curve: curve2)
 
-                                if let c = curve.clipToBox(box) {
+                                if let c = curve.clipToCurve(curve2) {
                                     Draw.drawCurve(context, curve: c)
                                 }
                                 
