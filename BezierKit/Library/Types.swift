@@ -100,6 +100,11 @@ public struct BBox<P>: Equatable where P: Point, P.F: Ordered {
     public var size: BKPoint {
         return max - min
     }
+    public func expand(_ amount: BKFloat) -> BoundingBox {
+        precondition(amount >= 0)
+        return BoundingBox(min: self.min - BKPoint(x: amount, y: amount),
+                           max: self.max + BKPoint(x: amount, y: amount))
+    }
     public func overlaps(_ other: BoundingBox) -> Bool {
         for i in 0..<P.dimensions {
             if self.min[i] > other.max[i] {

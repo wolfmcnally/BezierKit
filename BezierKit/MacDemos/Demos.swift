@@ -419,7 +419,7 @@ class Demos {
                                 Draw.drawCurve(context, curve: curve2)
 
                                 if let c = curve.clipToCurve(curve2) {
-                                    Draw.drawCurve(context, curve: c)
+                                    Draw.drawCurve(context, curve: c.curve)
                                 }
                                 
 //                                Draw.setColor(context, color: Draw.black)

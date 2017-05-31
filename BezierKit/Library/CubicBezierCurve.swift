@@ -175,7 +175,7 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
         return BoundingBox(min: mmin, max: mmax)
     }
     
-    public func clipToBox(_ box: BoundingBox) -> CubicBezierCurve? {
+    public func clipToBox(_ box: BoundingBox) -> Subcurve<CubicBezierCurve>? {
         
         let offset1 = box.max.y
         let offset2 = box.min.y
@@ -186,10 +186,15 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
         var rangeEnd: BKFloat? = nil
         
         let callback: (_ r: BKFloat) -> () = {(_ r: BKFloat) in
+            
+//            if r.isNaN {
+//                print("oh snappers")
+//            }
+            
             if r < 0.0 || r > 1.0 {
                 return
             }
-            if box.containsPoint(self.compute(r), 1.0e-6) {
+            if box.containsPoint(self.compute(r), 1.0e-3) {
                 if rangeStart == nil || r < rangeStart! {
                     rangeStart = r
                 }
@@ -222,11 +227,17 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
                      callback: callback)
         callback(1.0)
         
-        if rangeStart == nil {
+        if rangeStart == nil || (rangeStart! == rangeEnd!) {
             return nil
         }
         else {
-            return self.split(from: rangeStart!, to: rangeEnd!)
+            var s = Subcurve(t1: rangeStart!, t2: rangeEnd!, curve: self.split(from: rangeStart!, to: rangeEnd!))
+            
+//            if s.curve.p1.x.isNaN || s.curve.p1.y.isNaN {
+//                print("oh no boyyy")
+//            }
+            
+            return s
         }
         
     }
@@ -238,10 +249,10 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
                                 p3: BKPoint(self.p3.toCGPoint().applying(transform)))
     }
     
-    public func clipToCurve(_ other: CubicBezierCurve) -> CubicBezierCurve? {
+    public func clipToCurve(_ other: CubicBezierCurve) -> Subcurve<CubicBezierCurve>? {
      
         var d = other.endingPoint - other.startingPoint
-        if d.length > 1.0e-10 {
+        if d.length > 1.0e-7 {
             
             d = d.normalize()
             let n = BKPoint(x: -d.y, y: d.x)
@@ -252,7 +263,12 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
             let selfTransformed     = self.applyAffineTransform(inverted)
             let otherTransformed    = other.applyAffineTransform(inverted)
 
-            return selfTransformed.clipToBox(otherTransformed.boundingBox)?.applyAffineTransform(transform)
+            if let s = selfTransformed.clipToBox(otherTransformed.boundingBox.expand(0.01)) {
+                return Subcurve<CubicBezierCurve>(t1: s.t1, t2: s.t2, curve: self.split(from: s.t1, to: s.t2))
+            }
+            else {
+                return nil
+            }
             
         }
         else {

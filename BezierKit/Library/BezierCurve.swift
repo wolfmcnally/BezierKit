@@ -477,7 +477,7 @@ extension BezierCurve {
         var intersections: [Intersection] = []
         for l in c1 {
             for r in c2 {
-                Utils.pairiteration(l, r, &intersections, curveIntersectionThreshold)
+                Utils.pairiteration(l as! Subcurve<CubicBezierCurve>, r as! Subcurve<CubicBezierCurve>, &intersections, curveIntersectionThreshold)
             }
         }
         // TODO: you should probably have a unit test that ensures de-duping actually works

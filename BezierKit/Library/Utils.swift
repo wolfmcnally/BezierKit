@@ -249,6 +249,9 @@ internal class Utils {
     
     static func droots(_ pa: BKFloat, _ pb: BKFloat, _ pc: BKFloat, _ pd: BKFloat, callback:((BKFloat)->())) {
         let d = (-pa + 3*pb - 3*pc + pd)
+        if d == 0 {
+            return
+        }
         let a = (3*pa - 6*pb + 3*pc) / d
         let b = (-3*pa + 3*pb) / d
         let c = pa / d
@@ -409,53 +412,73 @@ internal class Utils {
         )
     }
     
-    static func pairiteration<C1, C2>(_ c1: Subcurve<C1>, _ c2: Subcurve<C2>, _ results: inout [Intersection], _ threshold: BKFloat = 0.5) {
-        let c1b = c1.curve.boundingBox
-        let c2b = c2.curve.boundingBox
+    static func pairiteration(_ c1: Subcurve<CubicBezierCurve>, _ c2: Subcurve<CubicBezierCurve>, _ results: inout [Intersection], _ threshold: BKFloat = 0.5) {
+        var c1b = c1.curve.boundingBox
+        var c2b = c2.curve.boundingBox
         if c1b.overlaps(c2b) == false {
             return
         }
-        else if ((c1b.size.x + c1b.size.y) < threshold && (c2b.size.x + c2b.size.y) < threshold) {
+        
+        var dim1 = (c1b.size.x + c1b.size.y)
+        var dim2 = (c2b.size.x + c2b.size.y)
+        
+        if dim1 < 0.5 * threshold && dim2 < 0.5 * threshold {
             
-            let a1 = c1.curve.startingPoint
-            let b1 = c1.curve.endingPoint - c1.curve.startingPoint
-            let a2 = c2.curve.startingPoint
-            let b2 = c2.curve.endingPoint - c2.curve.startingPoint
-            
-            let _a = b1.x
-            let _b = -b2.x
-            let _c = b1.y
-            let _d = -b2.y
-            
-            // by Cramer's rule we have
-            // t1 = ed - bf / ad - bc
-            // t2 = af - ec / ad - bc
-            let det = _a * _d - _b * _c
-            
-            let _e = -a1.x + a2.x
-            let _f = -a1.y + a2.y
-            
-            let inv_det = 1.0 / det
-            let t1 = ( _e * _d - _b * _f ) * inv_det
-            if t1 > 1.0 || t1 < 0.0  {
-                return // t1 out of interval [0, 1]
+            results.append(Intersection(t1: 0.5 * c1.t2 + 0.5 * c1.t1,
+                                        t2: 0.5 * c2.t2 + 0.5 * c2.t1))
+            return
+        }
+        
+        var curve1: Subcurve<CubicBezierCurve> = c1
+        var curve2: Subcurve<CubicBezierCurve> = c2
+        var curve1ClipFailedToShrink = true
+        var curve2ClipFailedToShrink = true
+        if dim1 >= 0.5 * threshold {
+            if let c = curve1.curve.clipToCurve( curve2.curve ) {
+                curve1 = Subcurve<CubicBezierCurve>(t1: curve1.t1 + (curve1.t2 - curve1.t1) * c.t1,
+                                                    t2: curve1.t1 + (curve1.t2 - curve1.t1) * c.t2,
+                                                    curve: c.curve)
+                let bounds = curve1.curve.boundingBox
+                curve1ClipFailedToShrink = (bounds.size.x + bounds.size.y) / dim1 > 0.8
             }
-            let t2 = ( _a * _f - _e * _c ) * inv_det
-            if t2 > 1.0 || t2 < 0.0 {
-                return // t2 out of interval [0, 1]
+            else {
+                return
             }
-            // segments intersect at t1, t2
-            results.append(Intersection(t1: t1 * c1.t2 + (1.0 - t1) * c1.t1,
-                                        t2: t2 * c2.t2 + (1.0 - t2) * c2.t1))
+        }
+        if dim2 >= 0.5 * threshold {
+            if let c = curve2.curve.clipToCurve( curve1.curve ) {
+                curve2 = Subcurve<CubicBezierCurve>(t1: curve2.t1 + (curve2.t2 - curve2.t1) * c.t1,
+                                                    t2: curve2.t1 + (curve2.t2 - curve2.t1) * c.t2,
+                                                    curve: c.curve)
+                let bounds = curve2.curve.boundingBox
+                curve2ClipFailedToShrink = (bounds.size.x + bounds.size.y) / dim2 > 0.8
+            }
+            else {
+                return
+            }
+        }
+        
+        c1b = curve1.curve.boundingBox
+        c2b = curve2.curve.boundingBox
+        dim1 = (c1b.size.x + c1b.size.y)
+        dim2 = (c2b.size.x + c2b.size.y)
+        
+        if curve1ClipFailedToShrink && curve2ClipFailedToShrink {
+            if dim1 > dim2 {
+                let cc1 = c1.split(at: 0.5)
+                Utils.pairiteration(cc1.left, c2, &results, threshold)
+                Utils.pairiteration(cc1.right, c2, &results, threshold)
+            }
+            else {
+                let cc2 = c2.split(at: 0.5)
+                Utils.pairiteration(c1, cc2.left, &results, threshold)
+                Utils.pairiteration(c1, cc2.right, &results, threshold)
+            }
         }
         else {
-            let cc1 = c1.split(at: 0.5)
-            let cc2 = c2.split(at: 0.5)
-            Utils.pairiteration(cc1.left, cc2.left, &results, threshold)
-            Utils.pairiteration(cc1.left, cc2.right, &results, threshold)
-            Utils.pairiteration(cc1.right, cc2.left, &results, threshold)
-            Utils.pairiteration(cc1.right, cc2.right, &results, threshold)
+            Utils.pairiteration(curve1, curve2, &results, threshold)
         }
+        
     }
         
     struct ShapeIntersection {
