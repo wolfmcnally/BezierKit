@@ -249,7 +249,20 @@ internal class Utils {
     
     static func droots(_ pa: BKFloat, _ pb: BKFloat, _ pc: BKFloat, _ pd: BKFloat, callback:((BKFloat)->())) {
         let d = (-pa + 3*pb - 3*pc + pd)
-        if d == 0 {
+        // TODO: horrible hack!!! we need to be systematic
+        if abs(d) < 1.0e-3 {
+            let a = (3*pa - 6*pb + 3*pc)
+            let b = (-3*pa + 3*pb)
+            let c = pa
+            if ( abs(a) < 1.0e-3) {
+                callback(-c / b)
+                return
+            }
+            let disc = b*b-4.0*a*c
+            if disc >= 0 {
+                callback((-b + sqrt(disc)) / (2.0 * a))
+                callback((-b - sqrt(disc)) / (2.0 * a))
+            }
             return
         }
         let a = (3*pa - 6*pb + 3*pc) / d
@@ -412,7 +425,7 @@ internal class Utils {
         )
     }
     
-    static func pairiteration(_ c1: Subcurve<CubicBezierCurve>, _ c2: Subcurve<CubicBezierCurve>, _ results: inout [Intersection], _ threshold: BKFloat = 0.5) {
+    static func pairiteration<C1, C2>(_ c1: Subcurve<C1>, _ c2: Subcurve<C2>, _ results: inout [Intersection], _ threshold: BKFloat = 0.5) {
         var c1b = c1.curve.boundingBox
         var c2b = c2.curve.boundingBox
         if c1b.overlaps(c2b) == false {
@@ -424,18 +437,18 @@ internal class Utils {
         
         if dim1 < 0.5 * threshold && dim2 < 0.5 * threshold {
             
-            results.append(Intersection(t1: 0.5 * c1.t2 + 0.5 * c1.t1,
-                                        t2: 0.5 * c2.t2 + 0.5 * c2.t1))
+            results.append(Intersection(t1: 0.5 * (c1.t1 + c1.t2),
+                                        t2: 0.5 * (c2.t1 + c2.t2)))
             return
         }
         
-        var curve1: Subcurve<CubicBezierCurve> = c1
-        var curve2: Subcurve<CubicBezierCurve> = c2
+        var curve1: Subcurve<C1> = c1
+        var curve2: Subcurve<C2> = c2
         var curve1ClipFailedToShrink = true
         var curve2ClipFailedToShrink = true
         if dim1 >= 0.5 * threshold {
             if let c = curve1.curve.clipToCurve( curve2.curve ) {
-                curve1 = Subcurve<CubicBezierCurve>(t1: curve1.t1 + (curve1.t2 - curve1.t1) * c.t1,
+                curve1 = Subcurve<C1>(t1: curve1.t1 + (curve1.t2 - curve1.t1) * c.t1,
                                                     t2: curve1.t1 + (curve1.t2 - curve1.t1) * c.t2,
                                                     curve: c.curve)
                 let bounds = curve1.curve.boundingBox
@@ -447,7 +460,7 @@ internal class Utils {
         }
         if dim2 >= 0.5 * threshold {
             if let c = curve2.curve.clipToCurve( curve1.curve ) {
-                curve2 = Subcurve<CubicBezierCurve>(t1: curve2.t1 + (curve2.t2 - curve2.t1) * c.t1,
+                curve2 = Subcurve<C2>(t1: curve2.t1 + (curve2.t2 - curve2.t1) * c.t1,
                                                     t2: curve2.t1 + (curve2.t2 - curve2.t1) * c.t2,
                                                     curve: c.curve)
                 let bounds = curve2.curve.boundingBox

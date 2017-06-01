@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreGraphics
 
 public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
  
@@ -175,73 +176,6 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
         return BoundingBox(min: mmin, max: mmax)
     }
     
-    public func clipToBox(_ box: BoundingBox) -> Subcurve<CubicBezierCurve>? {
-        
-        let offset1 = box.max.y
-        let offset2 = box.min.y
-        let offset3 = box.max.x
-        let offset4 = box.min.x
-        
-        var rangeStart: BKFloat? = nil
-        var rangeEnd: BKFloat? = nil
-        
-        let callback: (_ r: BKFloat) -> () = {(_ r: BKFloat) in
-            
-//            if r.isNaN {
-//                print("oh snappers")
-//            }
-            
-            if r < 0.0 || r > 1.0 {
-                return
-            }
-            if box.containsPoint(self.compute(r), 1.0e-3) {
-                if rangeStart == nil || r < rangeStart! {
-                    rangeStart = r
-                }
-                if rangeEnd == nil || r > rangeEnd! {
-                    rangeEnd = r
-                }
-            }
-        }
-        
-        callback(0.0)
-        Utils.droots(self.p0.y - offset1,
-                     self.p1.y - offset1,
-                     self.p2.y - offset1,
-                     self.p3.y - offset1,
-                     callback: callback)
-        Utils.droots(self.p0.y - offset2,
-                     self.p1.y - offset2,
-                     self.p2.y - offset2,
-                     self.p3.y - offset2,
-                     callback: callback)
-        Utils.droots(self.p0.x - offset3,
-                     self.p1.x - offset3,
-                     self.p2.x - offset3,
-                     self.p3.x - offset3,
-                     callback: callback)
-        Utils.droots(self.p0.x - offset4,
-                     self.p1.x - offset4,
-                     self.p2.x - offset4,
-                     self.p3.x - offset4,
-                     callback: callback)
-        callback(1.0)
-        
-        if rangeStart == nil || (rangeStart! == rangeEnd!) {
-            return nil
-        }
-        else {
-            var s = Subcurve(t1: rangeStart!, t2: rangeEnd!, curve: self.split(from: rangeStart!, to: rangeEnd!))
-            
-//            if s.curve.p1.x.isNaN || s.curve.p1.y.isNaN {
-//                print("oh no boyyy")
-//            }
-            
-            return s
-        }
-        
-    }
-    
     public func applyAffineTransform(_ transform: CGAffineTransform) -> CubicBezierCurve {
         return CubicBezierCurve(p0: BKPoint(self.p0.toCGPoint().applying(transform)),
                                 p1: BKPoint(self.p1.toCGPoint().applying(transform)),
@@ -249,33 +183,6 @@ public struct CubicBezierCurve: BezierCurve, Equatable, ArcApproximateable {
                                 p3: BKPoint(self.p3.toCGPoint().applying(transform)))
     }
     
-    public func clipToCurve(_ other: CubicBezierCurve) -> Subcurve<CubicBezierCurve>? {
-     
-        var d = other.endingPoint - other.startingPoint
-        if d.length > 1.0e-7 {
-            
-            d = d.normalize()
-            let n = BKPoint(x: -d.y, y: d.x)
-            
-            let transform = CGAffineTransform(a: d.x, b: n.x, c: d.y, d: n.y, tx: startingPoint.x, ty: startingPoint.y)
-            let inverted = transform.inverted()
-            
-            let selfTransformed     = self.applyAffineTransform(inverted)
-            let otherTransformed    = other.applyAffineTransform(inverted)
-
-            if let s = selfTransformed.clipToBox(otherTransformed.boundingBox.expand(0.01)) {
-                return Subcurve<CubicBezierCurve>(t1: s.t1, t2: s.t2, curve: self.split(from: s.t1, to: s.t2))
-            }
-            else {
-                return nil
-            }
-            
-        }
-        else {
-            return self.clipToBox(other.boundingBox)
-        }
-        
-    }
     
     public func compute(_ t: BKFloat) -> BKPoint {
         if t == 0 {
