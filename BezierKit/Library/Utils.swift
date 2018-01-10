@@ -8,6 +8,10 @@
 
 import Foundation
 
+#if os(iOS)
+import CoreGraphics
+#endif
+
 internal class Utils {
 
     // float precision significant decimal
@@ -16,14 +20,14 @@ internal class Utils {
     static let quart: BKFloat = BKFloat(Double.pi) / 2.0
     
     // Legendre-Gauss abscissae with n=24 (x_i values, defined at i=n as the roots of the nth order Legendre polynomial Pn(x))
-    static let Tvalues: [BKFloat] = [
+    static let Tvalues: ContiguousArray<BKFloat> = [
         -0.0640568928626056260850430826247450385909,
         0.0640568928626056260850430826247450385909,
         -0.1911188674736163091586398207570696318404,
         0.1911188674736163091586398207570696318404,
         -0.3150426796961633743867932913198102407864,
         0.3150426796961633743867932913198102407864,
-        -0.4337935076260451384870842319133497124524,
+        -0.4337935076260451384870842319133497124525,
         0.4337935076260451384870842319133497124524,
         -0.5454214713888395356583756172183723700107,
         0.5454214713888395356583756172183723700107,
@@ -44,7 +48,7 @@ internal class Utils {
     ]
     
     // Legendre-Gauss weights with n=24 (w_i values, defined by a function linked to in the Bezier primer article)
-    static let Cvalues: [BKFloat] = [
+    static let Cvalues: ContiguousArray<BKFloat> = [
         0.1279381953467521569740561652246953718517,
         0.1279381953467521569740561652246953718517,
         0.1258374563468282961213753825111836887264,
@@ -165,37 +169,75 @@ internal class Utils {
         return (v < 0) ? -pow(-v,1.0/3.0) : pow(v,1.0/3.0)
     }
     
-    static func roots(points: [BKPoint], line: Line = Line(p1: BKPoint(x: 0.0, y: 0.0), p2: BKPoint(x: 1.0, y: 0.0))) -> [BKFloat] {
+    static func clamp(_ x: BKFloat, _ a: BKFloat, _ b: BKFloat) -> BKFloat {
+        // note that if x is NaN all comparisons fail so we return NaN
+        // this is purposeful behavior, should probably have unit test
+        precondition(b >= a)
+        if x < a {
+            return a
+        }
+        else if x > b {
+            return b
+        }
+        else {
+            return x
+        }
+    }
+    
+    static func roots(points: [BKPoint], line: LineSegment = LineSegment(p0: BKPoint(x: 0.0, y: 0.0), p1: BKPoint(x: 1.0, y: 0.0))) -> [BKFloat] {
         let order = points.count - 1
-        let p = Utils.align(points, p1: line.p1, p2: line.p2)
-        let reduce: (BKFloat) -> Bool = { 0 <= $0 && $0 <= 1 }
+        let p = Utils.align(points, p1: line.p0, p2: line.p1)
+        
+        let epsilon: BKFloat = 1.0e-6
+        let reduce: (BKFloat) -> Bool = { (-epsilon) <= $0 && $0 <= (1 + epsilon) }
+        let clamp: (BKFloat) -> BKFloat = {
+            if $0 < 0.0 { return 0.0 }
+            else if $0 > 1.0 { return 1.0 }
+            else { return $0 }
+        }
         
         if order == 2 {
             let a = p[0].y
             let b = p[1].y
             let c = p[2].y
             let d = a - 2*b + c
-            if d != 0 {
+            if abs(d) > epsilon {
                 let m1 = -sqrt(b*b-a*c)
                 let m2 = -a+b
                 let v1: BKFloat = -( m1+m2)/d
                 let v2: BKFloat = -(-m1+m2)/d
-                return [v1, v2].filter(reduce)
+                return [v1, v2].filter(reduce).map(clamp)
             }
-            else if b != c && d == BKFloat(0.0) {
-                return [ BKFloat(2.0*b-c)/2.0*(b-c) ].filter(reduce)
+            else if a != b {
+                // TODO: also fix in droots!
+                return [BKFloat(0.5 * a / (a-b))].filter(reduce).map(clamp)
             }
             else {
                 return []
             }
         }
-        else {
+        else if order == 3 {
             // see http://www.trans4mind.com/personal_development/mathematics/polynomials/cubicAlgebra.htm
             let pa = p[0].y
             let pb = p[1].y
             let pc = p[2].y
             let pd = p[3].y
-            let d = (-pa + 3*pb - 3*pc + pd)
+            let temp1 = -pa
+            let temp2 = 3*pb
+            let temp3 = -3*pc
+            let d = temp1 + temp2 + temp3 + pd
+            if d == 0.0 {
+                // TODO: epsilon testing ... use demos upgrade the quadratic to a cubic!
+                let temp1 = 3*points[0]
+                let temp2 = -6*points[1]
+                let temp3 = 3*points[2]
+                let a = (temp1 + temp2 + temp3)
+                let temp4 = -3*points[0]
+                let temp5 = 3*points[1]
+                let b = (temp4 + temp5)
+                let c = points[0]
+                return roots(points: [c, b / 2.0 + c, a + b + c], line: line)
+            }
             let a = (3*pa - 6*pb + 3*pc) / d
             let b = (-3*pa + 3*pb) / d
             let c = pa / d
@@ -216,20 +258,48 @@ internal class Utils {
                 let x1 = t1 * cos(phi/3) - a/3
                 let x2 = t1 * cos((phi+tau)/3) - a/3
                 let x3 = t1 * cos((phi+2*tau)/3) - a/3
-                return [x1, x2, x3].filter(reduce)
+                return [x1, x2, x3].filter(reduce).map(clamp)
             }
             else if discriminant == 0 {
                 let u1 = q2 < 0 ? crt(-q2) : -crt(q2)
                 let x1 = 2*u1-a/3
                 let x2 = -u1 - a/3
-                return [x1,x2].filter(reduce)
+                return [x1,x2].filter(reduce).map(clamp)
             }
             else {
                 let sd = sqrt(discriminant)
                 let u1 = crt(-q2+sd)
                 let v1 = crt(q2+sd)
-                return [u1-v1-a/3].filter(reduce)
+                return [u1-v1-a/3].filter(reduce).map(clamp)
             }
+        }
+        else {
+            fatalError("unsupported")
+        }
+    }
+    
+    static func droots(_ a: BKFloat, _ b: BKFloat, _ c: BKFloat, callback:((BKFloat)->())) {
+        // quadratic roots are easy
+        // do something with each root
+        let d: BKFloat = a - 2.0*b + c
+        if d != 0 {
+            let m1 = -sqrt(b*b-a*c)
+            let m2 = -a+b
+            let v1 = -( m1+m2)/d
+            let v2 = -(-m1+m2)/d
+            callback(v1)
+            callback(v2)
+        }
+        else if (b != c) && (d == 0) {
+            callback((2*b-c)/(2*(b-c)))
+        }
+    }
+    
+    static func droots(_ a: BKFloat, _ b: BKFloat, callback:((BKFloat)->())) {
+        // linear roots are super easy
+        // do something with the root, if it exists
+        if a != b {
+            callback(a/(a-b))
         }
     }
     
@@ -247,24 +317,18 @@ internal class Utils {
                 let v2 = -(-m1+m2)/d
                 return [v1, v2]
             }
-            else if (b != c) && (d == 0) {
-                return [(2*b-c)/(2*(b-c))]
-            }
-            return []
         }
         else if p.count == 2 {
-            // linear roots are even easier
-            let a = p[0]
-            let b = p[1]
-            if a != b {
-                return [a/(a-b)]
+            droots(p[0], p[1]) {
+                result.append($0)
             }
-            return []
         }
         else {
-            fatalError("bad number of points for root finding")
+            fatalError("unsupported")
         }
+        return result
     }
+
     
     static func lerp(_ r: BKFloat, _ v1: BKPoint, _ v2: BKPoint) -> BKPoint {
         return v1 + r * (v2 - v1)
@@ -328,170 +392,55 @@ internal class Utils {
         return ( mdist:mdist, mpos:mpos! )
     }
     
-    static func makeline(_ p1: BKPoint,_ p2: BKPoint) -> CubicBezierCurve {
-        let x1 = p1.x
-        let y1 = p1.y
-        let x2 = p2.x
-        let y2 = p2.y
-        let dx = (x2-x1) / 3.0
-        let dy = (y2-y1) / 3.0
-        return CubicBezierCurve(p0: BKPoint(x: x1, y: y1),
-                                p1: BKPoint(x: x1+dx, y: y1+dy),
-                                p2: BKPoint(x: x1+2.0*dx, y: y1+2.0*dy),
-                                p3: BKPoint(x: x2, y: y2)
-        )
-    }
-    
-    static func distance2(_ p: BKPoint,_ l1: BKPoint,_ l2: BKPoint) -> (d2: BKFloat, t: BKFloat) {
-        let delta = l2 - l1
-        let rel = p - l1
-        let dot = rel.dot(delta)
-        let param: BKFloat = dot / delta.length2
-        var closest: BKPoint
-        var t: BKFloat
-        if param < 0 {
-            t = 0.0
-            closest = l1
+    static func pairiteration<C1, C2>(_ c1: Subcurve<C1>, _ c2: Subcurve<C2>, _ results: inout [Intersection], _ threshold: BKFloat = 0.5) {
+        let c1b = c1.curve.boundingBox
+        let c2b = c2.curve.boundingBox
+        if c1b.overlaps(c2b) == false {
+            return
         }
-        else if param > 1 {
-            t = 1.0
-            closest = l2
+        else if ((c1b.size.x + c1b.size.y) < threshold && (c2b.size.x + c2b.size.y) < threshold) {
+            
+            let a1 = c1.curve.startingPoint
+            let b1 = c1.curve.endingPoint - c1.curve.startingPoint
+            let a2 = c2.curve.startingPoint
+            let b2 = c2.curve.endingPoint - c2.curve.startingPoint
+            
+            let _a = b1.x
+            let _b = -b2.x
+            let _c = b1.y
+            let _d = -b2.y
+            
+            // by Cramer's rule we have
+            // t1 = ed - bf / ad - bc
+            // t2 = af - ec / ad - bc
+            let det = _a * _d - _b * _c
+            
+            let _e = -a1.x + a2.x
+            let _f = -a1.y + a2.y
+            
+            let inv_det = 1.0 / det
+            let t1 = ( _e * _d - _b * _f ) * inv_det
+            if t1 > 1.0 || t1 < 0.0  {
+                return // t1 out of interval [0, 1]
+            }
+            let t2 = ( _a * _f - _e * _c ) * inv_det
+            if t2 > 1.0 || t2 < 0.0 {
+                return // t2 out of interval [0, 1]
+            }
+            // segments intersect at t1, t2
+            results.append(Intersection(t1: t1 * c1.t2 + (1.0 - t1) * c1.t1,
+                                        t2: t2 * c2.t2 + (1.0 - t2) * c2.t1))
         }
         else {
-            t = param
-            closest = l1 + param * delta
-        }
-        return (d2: (p - closest).length2, t: t)
-    }
-    
-    static func lineIntersection(_ l11: BKPoint,_ l12: BKPoint,_ l21: BKPoint,_ l22: BKPoint, clamp: Bool = true) -> Intersection? {
-        
-        let a1 = l11
-        let b1 = l12 - l11
-        let a2 = l21
-        let b2 = l22 - l21
-        
-        let _a = b1.x
-        let _b = -b2.x
-        let _c = b1.y
-        let _d = -b2.y
-        
-        // by Cramer's rule we have
-        // t1 = ed - bf / ad - bc
-        // t2 = af - ec / ad - bc
-        let det = _a * _d - _b * _c
-        
-        let _e = -a1.x + a2.x
-        let _f = -a1.y + a2.y
-        
-        let inv_det = 1.0 / det
-        let t1 = ( _e * _d - _b * _f ) * inv_det
-        if clamp && (t1 >= 1.0 || t1 <= 0.0)  {
-            return nil // t1 out of interval [0, 1]
-        }
-        let t2 = ( _a * _f - _e * _c ) * inv_det
-        if clamp && (t2 >= 1.0 || t2 <= 0.0) {
-            return nil // t2 out of interval [0, 1]
-        }
-        // segments intersect at t1, t2
-        return Intersection(t1: t1, t2: t2)
-    }
-    
-    static func lineDistance2(a1: BKPoint, a2: BKPoint, b1: BKPoint, b2: BKPoint) -> (d2: BKFloat, t1: BKFloat, t2: BKFloat) {
-        if let i = lineIntersection(a1, a2, b1, b2) {
-            return (d2: 0.0, t1: i.t1, t2: i.t2)
-        }
-        else {
-            var (d2, t) = distance2(a1, b1, b2)
-            var shortest_d2 = d2
-            var t1: BKFloat = 0.0
-            var t2: BKFloat = t
-            (d2, t) = distance2(a2, b1, b2)
-            if d2 < shortest_d2 {
-                shortest_d2 = d2
-                t1 = 1.0
-                t2 = t
-            }
-            (d2, t) = distance2(b1, a1, a2)
-            if d2 < shortest_d2 {
-                shortest_d2 = d2
-                t1 = t
-                t2 = 0.0
-            }
-            (d2, t) = distance2(b2, a1, a2)
-            if d2 < shortest_d2 {
-                shortest_d2 = d2
-                t1 = t
-                t2 = 1.0
-            }
-            return (shortest_d2, t1, t2)
-        }
-    }
-    
-    static func pairiteration(_ c1: Subcurve, _ c2: Subcurve, _ threshold: BKFloat = 0.5) -> [Intersection] {
-        
-        let flatness1 = c1.curve.flatness()
-        let flatness2 = c2.curve.flatness()
-        
-        let (d2, t1, t2) = lineDistance2(a1: c1.curve.points[0],
-                                         a2: c1.curve.points.last!,
-                                         b1: c2.curve.points[0],
-                                         b2: c2.curve.points.last!)
-        
-        let threshold2 = threshold * threshold
-        if (flatness1 < threshold2) && (flatness2 < threshold2) {
-            if d2 == 0.0 {
-                return [Intersection(t1: t1 * c1.t2 + (1.0 - t1) * c1.t1,
-                                     t2: t2 * c2.t2 + (1.0 - t2) * c2.t1)]
-            }
-            else {
-              return []
-            }
-        }
-        else if ( d2 > flatness1 ) && ( d2 > flatness2 ) {
-            return []
-        }
-        
-        var pairs = Array<(left: Subcurve, right: Subcurve)>()
-        
-        if flatness1 < threshold2 {
-            let cc2 = c2.split(at: 0.5)
-            pairs = [
-                (left: c1, right: cc2.left),
-                (left: c1, right: cc2.right)]
-        }
-        else if flatness2 < threshold {
             let cc1 = c1.split(at: 0.5)
-            pairs = [
-                (left: cc1.left, right: c2),
-                (left: cc1.right, right: c2)]
-        }
-        else {
             let cc2 = c2.split(at: 0.5)
-            let cc1 = c1.split(at: 0.5)
-            pairs = [
-                (left: cc1.left, right: cc2.left),
-                (left: cc1.left, right: cc2.right),
-                (left: cc1.right, right: cc2.left),
-                (left: cc1.right, right: cc2.right)]
+            Utils.pairiteration(cc1.left, cc2.left, &results, threshold)
+            Utils.pairiteration(cc1.left, cc2.right, &results, threshold)
+            Utils.pairiteration(cc1.right, cc2.left, &results, threshold)
+            Utils.pairiteration(cc1.right, cc2.right, &results, threshold)
         }
-//        pairs = pairs.filter( {(pair) in
-//            return pair.left.curve.boundingBox.overlaps(pair.right.curve.boundingBox)
-//        })
-        
-        var results: [Intersection] = Array<Intersection>()
-        for pair in pairs {
-            results += Utils.pairiteration(pair.left, pair.right, threshold)
-        }
-        // sort the results by t1 (and by t2 if t1 equal)
-        results = results.sorted(by: <)
-        // de-dupe the sorted array
-        results = results.reduce(Array<Intersection>(), {(result: [Intersection], next: Intersection) in
-            return (result.count == 0 || result[result.count-1] != next) ? result + [next] : result
-        })
-        return results
     }
-    
+        
     struct ShapeIntersection {
         var c1: BezierCurve
         var c2: BezierCurve
@@ -527,8 +476,8 @@ internal class Utils {
     static func makeshape(_ forward: BezierCurve,_ back: BezierCurve,_ curveIntersectionThreshold: BKFloat) -> Shape {
         let bpl = back.points.count
         let fpl = forward.points.count
-        let start  = Utils.makeline(back.points[bpl-1], forward.points[0])
-        let end    = Utils.makeline(forward.points[fpl-1], back.points[0])
+        let start  = LineSegment(p0: back.points[bpl-1], p1: forward.points[0])
+        let end    = LineSegment(p0: forward.points[fpl-1], p1: back.points[0])
         let shape  = Shape(
             startcap: Shape.Cap(curve: start),
             endcap: Shape.Cap(curve: end),
@@ -543,7 +492,7 @@ internal class Utils {
         return shape
     }
     
-    static func getccenter( _ p1: BKPoint, _ p2: BKPoint, _ p3: BKPoint, _ interval: Arc.Interval) -> Arc {
+    static func getccenter( _ p1: BKPoint, _ p2: BKPoint, _ p3: BKPoint, _ interval: Interval) -> Arc {
         let d1 = p2 - p1
         let d2 = p3 - p2
         let d1p = BKPoint(x: d1.x * cos(quart) - d1.y * sin(quart),

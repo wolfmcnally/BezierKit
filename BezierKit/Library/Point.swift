@@ -6,8 +6,8 @@
 //  Copyright © 2017 Holmes Futrell. All rights reserved.
 //
 
-public protocol Point: VectorSpace, Normed {
-    associatedtype F: RealNumber // as in VectorSpace we have an associated type F. But F conforms to RealNumber, not just Field.
+public protocol Point: VectorSpace, Normed where F: RealNumber {
+
 }
 
 extension Point {
@@ -21,10 +21,31 @@ extension Point {
     public func normalize() -> Self {
         return self / self.length
     }
+    static func min<F>(_ p1: Point2<F>, _ p2: Point2<F>) -> Point2<F> {
+        // optimized version of min for Point2
+        return Point2<F>(x: p1.x < p2.x ? p1.x : p2.x,
+                         y: p1.y < p2.y ? p1.y : p2.y)
+    }
+    static func max<F>(_ p1: Point2<F>, _ p2: Point2<F>) -> Point2<F> {
+        // optimized version of max for Point2
+        return Point2<F>(x: p1.x > p2.x ? p1.x : p2.x,
+                         y: p1.y > p2.y ? p1.y : p2.y)
+    }
 }
 
-public protocol RealNumber: Field, Rootable {
+public func distance<F, P>(_ p1: P, _ p2: P) -> F where P: Point, P.F == F {
+    return (p1 - p2).length
+}
+
+public protocol RealNumber: Field, Rootable, Ordered, Equatable {
     // intentionally empty (just defines a composite protocol)
+}
+
+public protocol Ordered {
+    static func < (left: Self, right: Self) -> Bool
+    static func > (left: Self, right: Self) -> Bool
+    static func <= (left: Self, right: Self) -> Bool
+    static func >= (left: Self, right: Self) -> Bool
 }
 
 public protocol Rootable {
@@ -35,8 +56,12 @@ private let badSubscriptError = "bad subscript (out of bounds)"
 
 public struct Point2<S>: Point where S: RealNumber {
     public typealias F = S // specify the type used by VectorSpace protocol
-    var x : S, y : S
+    public var x : S, y : S
     // conformance to VectorSpace protocol
+    public init(x: S, y: S) {
+        self.x = x
+        self.y = y
+    }
     static public var dimensions: Int {
         return 2
     }
@@ -82,11 +107,19 @@ public struct Point2<S>: Point where S: RealNumber {
     public static prefix func - (point: Point2<S>) -> Point2<S> {
         return Point2<S>(x: -point.x, y: -point.y)
     }
+    public static func == (left: Point2<S>, right: Point2<S>) -> Bool {
+        return (left.x == right.x && left.y == right.y)
+    }
 }
 
 public struct Point3<S>: Point where S: RealNumber {
     public typealias F = S // specify the type used by VectorSpace protocol
-    var x : S, y: S, z: S
+    public var x : S, y: S, z: S
+    public init(x: S, y: S, z: S) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
     // conformance to VectorSpace protocol
     static public var dimensions: Int {
         return 3
@@ -139,4 +172,8 @@ public struct Point3<S>: Point where S: RealNumber {
     public static prefix func - (point: Point3<S>) -> Point3<S> {
         return Point3<S>(x: -point.x, y: -point.y, z: -point.z)
     }
+    public static func == (left: Point3<S>, right: Point3<S>) -> Bool {
+        return (left.x == right.x && left.y == right.y && left.z == right.z)
+    }
+
 }
