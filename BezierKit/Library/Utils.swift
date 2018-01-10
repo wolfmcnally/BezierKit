@@ -304,18 +304,11 @@ internal class Utils {
     }
     
     static func droots(_ p: [BKFloat]) -> [BKFloat] {
+        // quadratic roots are easy
+        var result: [BKFloat] = []
         if p.count == 3 {
-            // quadratic roots are easy
-            let a = p[0]
-            let b = p[1]
-            let c = p[2]
-            let d = a - 2*b + c
-            if d != 0 {
-                let m1 = -sqrt(b*b-a*c)
-                let m2 = -a+b
-                let v1 = -( m1+m2)/d
-                let v2 = -(-m1+m2)/d
-                return [v1, v2]
+            droots(p[0], p[1], p[2]) {
+                result.append($0)
             }
         }
         else if p.count == 2 {
@@ -328,7 +321,6 @@ internal class Utils {
         }
         return result
     }
-
     
     static func lerp(_ r: BKFloat, _ v1: BKPoint, _ v2: BKPoint) -> BKPoint {
         return v1 + r * (v2 - v1)

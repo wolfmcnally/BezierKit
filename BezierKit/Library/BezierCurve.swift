@@ -372,6 +372,25 @@ extension BezierCurve {
         return self.internalOffset(t: t, distance: d).p
     }
     
+    public func flatness() -> BKFloat {
+        // https://jeremykun.com/2013/05/11/bezier-curves-and-picasso/
+        if self.order == 3 {
+            let P0 = self.points[0]
+            let P1 = self.points[1]
+            let P2 = self.points[2]
+            let P3 = self.points[3]
+            let a: BKPoint = 3.0 * P1 - 2.0 * P0 - P3
+            let b: BKPoint = 3.0 * P2 - P0 - 2.0 * P3
+            let temp1 = max(a.x * a.x, b.x * b.x)
+            let temp2 = max(a.y * a.y, b.y * b.y)
+            return (1.0 / 16.0) * (temp1 + temp2)
+        }
+        else {
+            // TODO: implement me
+            assert(false, "unimplemented!")
+        }
+    }
+    
     private func internalOffset(t: BKFloat, distance d: BKFloat) -> (c: BKPoint, n: BKPoint, p: BKPoint) {
         let c = self.compute(t)
         let n = self.normal(t)
