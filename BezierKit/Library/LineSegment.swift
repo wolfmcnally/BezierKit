@@ -11,6 +11,11 @@ import CoreGraphics
 public struct LineSegment: BezierCurve, Equatable {
 
     public var p0, p1: CGPoint
+
+    public init(from p0: CGPoint, to p1: CGPoint) {
+        self.p0 = p0
+        self.p1 = p1
+    }
     
     public init(points: [CGPoint]) {
         precondition(points.count == 2)

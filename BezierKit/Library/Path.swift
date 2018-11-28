@@ -153,7 +153,81 @@ internal func windingCountImpliesContainment(_ count: Int, using rule: PathFillR
     }
     
     // MARK: - vector boolean operations
-    
+
+//    public func outline(distance: CGFloat) -> Path {
+//        var newSubpaths = [PathComponent]()
+//        for subpath in subpaths {
+//            var newCurves = [PathComponent]()
+//            for curve in subpath.curves {
+//                let newCurve: PathComponent
+//                switch curve {
+//                case let c as CubicBezierCurve:
+//                    newCurve = c.outline(distance: distance)
+//                case let c as QuadraticBezierCurve:
+//                    newCurve = c.outline(distance: distance)
+//                case let c as LineSegment:
+//                    newCurve = c.outline(distance: distance)
+//                default:
+//                    fatalError("Unsupported.")
+//                }
+//                newCurves.append(newCurve)
+//            }
+//            newSubpaths.append(PathComponent(curves: newCurves))
+//        }
+//        return Path(subpaths: newSubpaths)
+//    }
+
+    public func split(at location: IndexedPathLocation) -> (left: Path, right: Path) {
+        precondition(subpaths.count == 1)
+        var isLeft = true
+        let component = subpaths.first!
+        var leftCurves = [BezierCurve]()
+        var rightCurves = [BezierCurve]()
+        for (elementIndex, curve) in component.curves.enumerated() {
+            if location.elementIndex == elementIndex {
+                let leftCurve: BezierCurve
+                let rightCurve: BezierCurve
+                switch curve {
+                case let c as CubicBezierCurve:
+                    let (l, r) = c.split(at: location.t)
+                    leftCurve = l
+                    rightCurve = r
+                case let c as QuadraticBezierCurve:
+                    let (l, r) = c.split(at: location.t)
+                    leftCurve = l
+                    rightCurve = r
+                case let c as LineSegment:
+                    let (l, r) = c.split(at: location.t)
+                    leftCurve = l
+                    rightCurve = r
+                default:
+                    fatalError("Unsupported.")
+                }
+
+                leftCurves.append(leftCurve)
+                rightCurves.append(rightCurve)
+                isLeft = false
+            } else {
+                if isLeft {
+                    leftCurves.append(curve)
+                } else {
+                    rightCurves.append(curve)
+                }
+            }
+        }
+        let leftComponent = PathComponent(curves: leftCurves)
+        let rightComponent = PathComponent(curves: rightCurves)
+        let leftPath = Path(subpaths: [leftComponent])
+        let rightPath = Path(subpaths: [rightComponent])
+        return (leftPath, rightPath)
+    }
+
+    public func split(from location1: IndexedPathLocation, to location2: IndexedPathLocation) -> Path {
+        let (_, right) = split(at: location1)
+        let (finished, _) = right.split(at: location2)
+        return finished
+    }
+
     public func point(at location: IndexedPathLocation) -> CGPoint {
         return self.element(at: location).compute(location.t)
     }
